@@ -7,11 +7,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -92,7 +90,7 @@ public class CustomerFacadeController<T extends BaseRecord> {
         ;
         return ResponseEntity.ok().body(customer);
     }
-
+    
     // save customer
     @RequestMapping(value = "/save", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CustomerDto> createCustomer(@RequestBody String customerData) {
@@ -105,7 +103,9 @@ public class CustomerFacadeController<T extends BaseRecord> {
             List<Address> savedAddresses = new ArrayList<>();
             
             newCustomer.getAddress().forEach(address -> {
+                address.setCustomer(cust);
                 Address savedAddress = addressRepo.save(address);
+                savedAddress.setCustomer(cust);
                 savedAddresses.add(savedAddress);
             });
             cust.setAddress(savedAddresses);

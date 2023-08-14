@@ -57,9 +57,15 @@ public class MapperUtil {
                 addressDto.setCustomer(serialize(address.getCustomer()));
                 return addressDto;
         };
-        
 
-    public static List<AddressDto> serialize( List<Address> address){
+
+        
+        //  public static List<ProductDto> serialize(List<Product> recList)
+        //  {
+        //     return (List<ProductDto>) new ArrayList<ProductDto>();
+        //  }
+
+    public static List<AddressDto> serialize(List<Address> address){
         List<AddressDto> addr= address.stream().map(addrRec -> {
                 AddressDto addressDto = serialize(addrRec);
                 return addressDto;
@@ -86,20 +92,27 @@ public class MapperUtil {
 
     public static Customer deserialize(CustomerDto dto) {
         Customer customer = new Customer();
-        
+        if(dto.getID()!=null){
+            
         customer.setID(dto.getID());
+        }
         customer.setName(dto.getName());
         customer.setSurname(dto.getSurname());
         return customer;
     }
 
     public static Address deserialize(AddressDto addressdto){
-            System.out.println(addressdto);
             Address address = new Address();
+            if(addressdto.getID()!=null){
+                
             address.setID(addressdto.getID());
+            }
             address.setStreet(addressdto.getStreet());
             address.setCity(addressdto.getCity());
+            if(addressdto.getCustomer()!=null){
+                
             address.setCustomer(deserialize(addressdto.getCustomer()));
+            }
         return address;
     } 
 
