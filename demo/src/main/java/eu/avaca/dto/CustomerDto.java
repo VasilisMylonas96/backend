@@ -6,9 +6,15 @@ import java.util.ArrayList;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.Lob;
+
 
 public class CustomerDto extends BaseRecordDto
 {
+      
+    private List<byte[]> content;
     private String name;
     
     private String surname;
@@ -16,7 +22,14 @@ public class CustomerDto extends BaseRecordDto
     private List<AddressDto> address=new ArrayList<>();
 
     public CustomerDto() {}
+   @JsonIgnore
+    public List<byte[]> getContent() {
+        return content;
+    }
 
+    public void setContent(List<byte[]> content) {
+        this.content = content;
+    }
     public String getName() {
         return name;
     }
@@ -59,6 +72,7 @@ public class CustomerDto extends BaseRecordDto
         buf.append(this.getID() + "\t");
         buf.append(this.name + "\t");
         buf.append(this.surname + "\n\n");
+        buf.append(this.content + "\n\n");
         return buf.toString();
     }
 }

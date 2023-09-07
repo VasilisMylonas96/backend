@@ -29,6 +29,9 @@ public class MapperUtil {
         dto.setID(customer.getID());
         dto.setName(customer.getName());
         dto.setSurname(customer.getSurname());
+       
+        dto.setContent(null);
+
 
         // List<AddressDto> addressDtos = new ArrayList<>();
         // List<Address> addresses = customer.getAddress();
@@ -98,6 +101,9 @@ public class MapperUtil {
         }
         customer.setName(dto.getName());
         customer.setSurname(dto.getSurname());
+
+       // System.out.print(dto.getContent());
+        customer.setContent(null);
         return customer;
     }
 
@@ -126,7 +132,10 @@ public class MapperUtil {
     }
 
 
-
+    public static String toJson(CustomerDto object) throws JsonProcessingException {
+        return objectMapper.writeValueAsString(object);
+    }
+    
     public static String toJson(List<CustomerDto> object) throws JsonProcessingException {
         return objectMapper.writeValueAsString(object);
     }

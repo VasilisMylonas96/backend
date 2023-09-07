@@ -1,22 +1,28 @@
 package eu.boot;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -29,6 +35,7 @@ import eu.avaca.model.Customer;
 import eu.avaca.repositories.CustomerRepository;
 import eu.avaca.repositories.AddressRepository;
 import eu.boot.exception.ResourceNotFound;
+import jakarta.transaction.Transactional;
 
 @RestController
 @RequestMapping("/Facade/cust")
@@ -61,18 +68,41 @@ public class CustomerFacadeController<T extends BaseRecord> {
     //     return listAsJson;
     // }
 
+    // @RequestMapping(value = "/getAll", method = RequestMethod.GET)
+    // public String getAllCustomers() throws JsonProcessingException {
+    //     List<Customer> customers = customerRepo.findAll();
+       
+    //     List<CustomerDto> dtoList = customers.stream().map(customer -> { 
+            
+    //         return autoSerialize(customer); 
+    //     }).collect(Collectors.toList());
+    //     String listAsJson = MapperUtil.toJson(dtoList); 
+    //    // System.out.println(listAsJson);
+    //     //printAll(dtoList);
+    //     //System.out.println(MapperUtil.toJson(dtoList));
+    //     System.out.println(dtoList);
+    //     return listAsJson;
+    // }
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)
-    public String getAllCustomers() throws JsonProcessingException {
+    public List<Object[]> getAllCustomers() throws JsonProcessingException {
         List<Customer> customers = customerRepo.findAll();
+        List<Object[]> responseMap = new ArrayList<>();
+        for (Customer customer : customers) {
+            Object[] customerArray = new Object[3]; // Τρία στοιχεία: customerJson, customerContent, filename
 
-        List<CustomerDto> dtoList = customers.stream().map(customer -> { 
-            return autoSerialize(customer); 
-        }).collect(Collectors.toList());
-        String listAsJson = MapperUtil.toJson(dtoList); 
-        System.out.println(listAsJson);
-        printAll(dtoList);
-        //System.out.println(MapperUtil.toJson(dtoList));
-        return listAsJson;
+            CustomerDto responedCustomer = autoSerialize(customer);
+            customerArray[0] = MapperUtil.toJson(responedCustomer);
+    
+            // Convert LOB data to Base64
+            byte[] content = customer.getContent();
+            customerArray[1] = content;
+    
+            customerArray[2] = customer.getFileName();
+    
+            responseMap.add(customerArray);
+            }
+
+        return responseMap;
     }
 
 
@@ -92,16 +122,25 @@ public class CustomerFacadeController<T extends BaseRecord> {
     }
     
     // save customer
-    @RequestMapping(value = "/save", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<CustomerDto> createCustomer(@RequestBody String customerData) {
+ @PostMapping(value = "/save", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<List<Object>> createCustomer(
+    @RequestPart("customerData") String customerData,
+    @RequestPart("file_0") MultipartFile file0){
         Customer newCustomer;
+        
        
+        
         try {
             newCustomer = autoDeserialize(MapperUtil.fromJson(customerData));  
-             
+           
+            byte[] fileBytes = file0.getBytes();
+            String originalFilename = file0.getOriginalFilename();
+             newCustomer.setContent(fileBytes);
+            newCustomer.setFileName(originalFilename);
             Customer cust = customerRepo.save(newCustomer);
+
             List<Address> savedAddresses = new ArrayList<>();
-            
+            System.out.println(cust.getContent());
             newCustomer.getAddress().forEach(address -> {
                 address.setCustomer(cust);
                 Address savedAddress = addressRepo.save(address);
@@ -109,42 +148,78 @@ public class CustomerFacadeController<T extends BaseRecord> {
                 savedAddresses.add(savedAddress);
             });
             cust.setAddress(savedAddresses);
+
+
             System.out.println("Record saved");
             System.out.println("ID is: " + cust.getID());
             System.out.println(cust);
              System.out.println(cust.getAddress());
-            CustomerDto responedCustomer=autoSerialize(cust);
+            System.out.println(cust.content);
 
-            return ResponseEntity.ok(responedCustomer);
+            List<Object> customerArray = new ArrayList<>();
+            CustomerDto responedCustomer = autoSerialize(cust);
+            customerArray.add(MapperUtil.toJson(responedCustomer));
+            customerArray.add(cust.getContent());
+            customerArray.add(cust.getFileName());
+    
+           
+          
+            return ResponseEntity.ok(customerArray);
             
         } catch (JsonProcessingException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
             return null;
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
+        return null;
       
     }
 
 
     // update customer
     @PutMapping("/update/{id}")
-    public ResponseEntity<CustomerDto> updateCustomer(@PathVariable(value = "id") Long customerId,@RequestBody String customerData) throws ResourceNotFound {
-        try {
+    public ResponseEntity<List<Object>> updateCustomer(
+        @PathVariable(value = "id") Long customerId, 
+        @RequestPart("customerData") String customerData,
+        @RequestPart(name = "file_0", required = false) MultipartFile file0) throws ResourceNotFound {
+       try {
             Customer editedCustomer=autoDeserialize(MapperUtil.fromJson(customerData));
             
             Customer customer = customerRepo.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFound("Customer not found for this id :: " + customerId));
 
-            customer.setID(editedCustomer.getID());
+
             customer.setName(editedCustomer.getName());
             customer.setSurname(editedCustomer.getSurname()); 
-
+            if (file0 != null) {
+                try {
+                    byte[] fileBytes = file0.getBytes();
+                    String originalFilename = file0.getOriginalFilename();
+                    customer.setContent(fileBytes);
+                    customer.setFileName(originalFilename);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            customer.getAddress().clear();
+            List<Address> savedAddresses = new ArrayList<>();
+            
             editedCustomer.getAddress().forEach(address -> {
-                addressRepo.save(address);
-
+                address.setCustomer(customer);
+                Address savedAddress = addressRepo.save(address);
+                savedAddress.setCustomer(customer);
+                savedAddresses.add(savedAddress);
             });
+             customer.setAddress(savedAddresses); 
             final Customer updatedCustomer = customerRepo.save(customer); 
-            CustomerDto responedCustomer=autoSerialize(updatedCustomer);
+            List<Object> responedCustomer = new ArrayList<>();
+            CustomerDto  customerArray= autoSerialize(updatedCustomer);
+            responedCustomer.add(MapperUtil.toJson(customerArray));
+            responedCustomer.add(updatedCustomer.getContent());
+            responedCustomer.add(updatedCustomer.getFileName());
             return ResponseEntity.ok(responedCustomer);
             
 
@@ -153,10 +228,7 @@ public class CustomerFacadeController<T extends BaseRecord> {
             e.printStackTrace();
             return null;
         }
-       
-
-        
-       
+             
         // customer.setAddress(customerData.getAddress());
         //
 
@@ -200,7 +272,7 @@ public class CustomerFacadeController<T extends BaseRecord> {
         
         List<Address> addresses=MapperUtil.deserialize(customer.getAddress());
         updaCustomer.setAddress(addresses);
-         System.out.println(updaCustomer);
+        // System.out.println(updaCustomer);
         return updaCustomer;
     }
 
